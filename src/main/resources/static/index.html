@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Laborator AI — Rețea neurală 8×8 & Algoritm genetic</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="bg-glow"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">AI</div>
+    <div>
+      <h1>Laborator AI</h1>
+      <p>Rețele neurale &amp; algoritmi genetici · Java + Spring Boot</p>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button class="tab active" data-tab="nn"><span>🧠</span> Rețea neurală 8×8</button>
+    <button class="tab" data-tab="ga"><span>🧬</span> Algoritm genetic</button>
+  </nav>
+  <div id="server-status" class="server-status"><i></i><span>conectare…</span></div>
+</header>
+
+<main>
+  <!-- ===================== TAB 1: REȚEA NEURALĂ ===================== -->
+  <section id="tab-nn" class="panel active">
+    <div class="hero">
+      <div>
+        <span class="eyebrow">Învățare supravegheată</span>
+        <h2>O rețea neurală care învață să recunoască cifre desenate pe 8×8 pixeli</h2>
+        <p>Desenează o cifră, apasă <b>Antrenează</b> și privește cum ponderile se schimbă și predicția devine
+          tot mai sigură. Antrenarea (backpropagation) rulează în Java, pe server.</p>
+      </div>
+      <div class="pills">
+        <span class="pill">64 intrări</span>
+        <span class="pill">tanh + softmax</span>
+        <span class="pill">SGD + momentum</span>
+      </div>
+    </div>
+
+    <div class="layout-nn">
+      <aside class="col">
+        <div class="card">
+          <h3 class="card-title"><span class="step">1</span>Desenează o cifră</h3>
+          <p class="hint">Click stânga = desenează · click dreapta (sau Shift) = șterge.
+            Fiecare pixel e un neuron de intrare.</p>
+          <canvas id="nn-draw" class="pixel-canvas"></canvas>
+          <div class="row">
+            <button id="nn-clear" class="ghost">✕ Șterge</button>
+            <button id="nn-random" class="ghost">🎲 Exemplu aleator</button>
+          </div>
+          <div class="row add-row">
+            <label class="inline">Eticheta <select id="nn-label"></select></label>
+            <button id="nn-add">+ Adaugă la antrenare</button>
+          </div>
+          <p id="nn-draw-msg" class="hint small"></p>
+        </div>
+        <div class="card">
+          <h3 class="card-title"><span class="step">↯</span>Predicția rețelei</h3>
+          <div id="nn-pred"></div>
+        </div>
+      </aside>
+
+      <div class="card net-card">
+        <div class="card-head">
+          <h3 class="card-title"><span class="step">2</span>Rețeaua neurală</h3>
+          <div class="row tight">
+            <div class="segmented" id="nn-view">
+              <button data-value="w" class="active">Ponderi</button>
+              <button data-value="s">Semnal</button>
+            </div>
+            <label class="inline">Ascunde conexiunile slabe
+              <input id="nn-thr" type="range" min="0" max="0.8" step="0.05" value="0.15">
+            </label>
+          </div>
+        </div>
+        <canvas id="nn-net"></canvas>
+        <div class="legend">
+          <span><i class="sw" style="background:#5aaaff"></i>pozitiv</span>
+          <span><i class="sw" style="background:#ff7850"></i>negativ</span>
+          <span><i class="sw" style="background:#3ddc84"></i>probabilitate ieșire</span>
+          <span id="nn-hover-info" class="hover-info">Treci cu mouse-ul peste un neuron ca să-i vezi conexiunile.</span>
+        </div>
+      </div>
+
+      <aside class="col">
+        <div class="card">
+          <h3 class="card-title"><span class="step">3</span>Antrenare</h3>
+          <div class="field">
+            <span>Straturi ascunse</span>
+            <select id="nn-arch">
+              <option value="8">8</option>
+              <option value="8,8">8 → 8</option>
+              <option value="16">16</option>
+              <option value="16,16" selected>16 → 16</option>
+              <option value="32,16">32 → 16</option>
+              <option value="16,16,16">16 → 16 → 16</option>
+            </select>
+          </div>
+          <div class="field">
+            <span>Rată de învățare</span><b id="nn-lr-val"></b>
+            <input id="nn-lr" type="range" min="0.005" max="0.3" step="0.005" value="0.05">
+          </div>
+          <div class="field">
+            <span>Viteză (batch-uri / cerere)</span><b id="nn-speed-val"></b>
+            <input id="nn-speed" type="range" min="1" max="40" step="1" value="4">
+          </div>
+          <div class="field">
+            <span>Zgomot în date</span><b id="nn-noise-val"></b>
+            <input id="nn-noise" type="range" min="0" max="0.5" step="0.05" value="0.15">
+          </div>
+          <div class="row">
+            <button id="nn-train" class="primary wide">▶ Antrenează</button>
+          </div>
+          <div class="row">
+            <button id="nn-epoch">+1 epocă</button>
+            <button id="nn-reset" title="Ponderi aleatoare noi">↺ Reset</button>
+            <button id="nn-regen" title="Generează alte exemple de antrenare">⟳ Date noi</button>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Epoca</div><div class="v" id="nn-s-epoch">0</div></div>
+            <div class="stat"><div class="k">Eroare (loss)</div><div class="v" id="nn-s-loss">–</div></div>
+            <div class="stat"><div class="k">Acuratețe antrenare</div><div class="v" id="nn-s-train">–</div></div>
+            <div class="stat accent"><div class="k">Acuratețe test</div><div class="v" id="nn-s-test">–</div></div>
+            <div class="stat"><div class="k">Exemple antrenare</div><div class="v" id="nn-s-samples">–</div></div>
+            <div class="stat"><div class="k">Parametri</div><div class="v" id="nn-s-params">–</div></div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="layout-nn-bottom">
+      <div class="card">
+        <h3 class="card-title"><span class="step">📉</span>Eroarea pe epoci</h3>
+        <canvas id="nn-loss" class="chart"></canvas>
+      </div>
+      <div class="card">
+        <h3 class="card-title"><span class="step">📈</span>Acuratețea pe epoci</h3>
+        <canvas id="nn-acc" class="chart"></canvas>
+      </div>
+      <div class="card">
+        <h3 class="card-title"><span class="step">👁</span>Ce „vede” stratul ascuns 1</h3>
+        <p class="hint">Ponderile fiecărui neuron, așezate pe grila 8×8. Albastru = „vreau pixel aprins aici”,
+          portocaliu = „vreau pixel stins aici”.</p>
+        <canvas id="nn-fields"></canvas>
+      </div>
+    </div>
+
+    <details class="card explain">
+      <summary>Cum funcționează?</summary>
+      <div class="explain-grid">
+        <div><h4>1 · Intrarea</h4><p>Imaginea de 8×8 devine un vector de <b>64 de numere</b> între 0 și 1 —
+          neuronii de intrare.</p></div>
+        <div><h4>2 · Propagarea înainte</h4><p>Fiecare neuron ascuns calculează o sumă ponderată + bias și o trece
+          prin <code>tanh</code>. Ieșirea (10 neuroni) folosește <code>softmax</code> → probabilități.</p></div>
+        <div><h4>3 · Backpropagation</h4><p>Eroarea (cross-entropy) e propagată înapoi și fiecare pondere e
+          ajustată puțin în direcția care o scade (gradient descent cu momentum).</p></div>
+        <div><h4>4 · Generalizare</h4><p>Acuratețea de <i>test</i> e măsurată pe exemple nevăzute la antrenare.
+          Dacă e mult sub cea de antrenare, rețeaua „a învățat pe de rost”.</p></div>
+      </div>
+    </details>
+  </section>
+
+  <!-- ===================== TAB 2: ALGORITM GENETIC ===================== -->
+  <section id="tab-ga" class="panel">
+    <div class="hero">
+      <div>
+        <span class="eyebrow ga">Evoluție</span>
+        <h2>Doi vectori părinte, o bucată din fiecare — și bucata bună se înmulțește</h2>
+        <p>Fiecare individ e un vector de 64 de gene. Cei mai buni se încrucișează, copiii moștenesc părți din
+          fiecare părinte, iar generație după generație populația se apropie de țintă.</p>
+      </div>
+      <div class="pills">
+        <span class="pill">selecție turneu</span>
+        <span class="pill">încrucișare</span>
+        <span class="pill">mutație</span>
+        <span class="pill">elitism</span>
+      </div>
+    </div>
+
+    <div class="layout-ga">
+      <aside class="col">
+        <div class="card">
+          <h3 class="card-title"><span class="step ga">🎯</span>Ținta · 64 de gene</h3>
+          <p class="hint">Fitness = câte gene se potrivesc cu ținta. Poți desena ținta chiar și în timpul evoluției.</p>
+          <canvas id="ga-target" class="pixel-canvas"></canvas>
+          <div class="row">
+            <select id="ga-preset">
+              <option value="heart">❤ Inimă</option>
+              <option value="smile">☺ Zâmbet</option>
+              <option value="arrow">➤ Săgeată</option>
+              <option value="eight">8 Cifra 8</option>
+              <option value="checker">▦ Tablă de șah</option>
+              <option value="random">🎲 Aleator</option>
+            </select>
+            <button id="ga-clear-target" class="ghost">✕ Golește</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3 class="card-title"><span class="step ga">⚙</span>Parametri</h3>
+          <div class="field">
+            <span>Mărimea populației</span><b id="ga-pop-val"></b>
+            <input id="ga-pop" type="range" min="4" max="120" step="2" value="40">
+          </div>
+          <div class="field">
+            <span>Rata de mutație / genă</span><b id="ga-mut-val"></b>
+            <input id="ga-mut" type="range" min="0" max="0.15" step="0.005" value="0.015">
+          </div>
+          <div class="field">
+            <span>Încrucișare</span>
+            <select id="ga-cross-type">
+              <option value="one">un punct de tăiere</option>
+              <option value="two">două puncte de tăiere</option>
+              <option value="uniform">uniformă (genă cu genă)</option>
+            </select>
+          </div>
+          <div class="field">
+            <span>Elitism (cel mai bun trece mai departe)</span>
+            <label class="switch"><input id="ga-elite" type="checkbox" checked><i></i></label>
+          </div>
+          <div class="field">
+            <span>Viteză (generații / secundă)</span><b id="ga-speed-val"></b>
+            <input id="ga-speed" type="range" min="1" max="120" step="1" value="6">
+          </div>
+          <div class="row">
+            <button id="ga-start" class="primary wide ga">▶ Start evoluție</button>
+          </div>
+          <div class="row">
+            <button id="ga-step">+1 generație</button>
+            <button id="ga-reset">↺ Populație nouă</button>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="k">Generația</div><div class="v" id="ga-s-gen">0</div></div>
+            <div class="stat accent"><div class="k">Cel mai bun</div><div class="v" id="ga-s-best">–</div></div>
+            <div class="stat"><div class="k">Media populației</div><div class="v" id="ga-s-avg">–</div></div>
+            <div class="stat"><div class="k">Încrucișări totale</div><div class="v" id="ga-s-cross">0</div></div>
+          </div>
+          <p id="ga-status" class="status"></p>
+        </div>
+      </aside>
+
+      <div class="col">
+        <div class="card">
+          <h3 class="card-title"><span class="step ga">✂</span>Încrucișare: 2 vectori părinte → 1 copil</h3>
+          <p class="hint">Cel mai bun copil din ultima generație. Partea <span class="ca">albastră</span> vine de la
+            părintele A, partea <span class="cb">portocalie</span> de la B; genele estompate n-au fost moștenite.
+            Sub fiecare genă: <span class="cg">verde</span> = potrivită cu ținta („bucata bună”),
+            <span class="cr">roșu</span> = greșită. Contur <span class="cy">galben</span> = mutație.</p>
+          <canvas id="ga-cross"></canvas>
+        </div>
+        <div class="card">
+          <h3 class="card-title"><span class="step ga">📈</span>Evoluția fitness-ului</h3>
+          <canvas id="ga-chart" class="chart tall"></canvas>
+        </div>
+        <div class="ga-bottom">
+          <div class="card">
+            <h3 class="card-title"><span class="step ga">🧪</span>Fondul genetic</h3>
+            <p class="hint">Pentru fiecare poziție: ce procent din populație are gena corectă.
+              Așa se vede cum „bucățile bune” se înmulțesc.</p>
+            <canvas id="ga-pool"></canvas>
+          </div>
+          <div class="card">
+            <h3 class="card-title"><span class="step ga">👥</span>Populația (sortată după fitness)</h3>
+            <p class="hint"><span class="cy">Galben</span> = elita copiată, <span class="cg">verde</span> = cel mai bun
+              copil nou. Pixelii <span class="cr">roșii</span> sunt gene aprinse greșit.</p>
+            <canvas id="ga-population"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <details class="card explain">
+      <summary>Cum funcționează?</summary>
+      <div class="explain-grid">
+        <div><h4>1 · Populația</h4><p>Vectori de 64 de biți complet aleatori — în medie ~50% potrivire cu ținta.</p></div>
+        <div><h4>2 · Selecția</h4><p>Turneu: se aleg 3 indivizi la întâmplare, cel mai bun devine părinte.
+          Indivizii buni se reproduc mai des.</p></div>
+        <div><h4>3 · Încrucișarea</h4><p>Copilul ia o bucată din vectorul A și restul din vectorul B. Dacă A are
+          partea de sus bună și B partea de jos, copilul le poate avea pe amândouă.</p></div>
+        <div><h4>4 · Mutația</h4><p>Câteva gene se inversează aleator — sursa de noutate, care repară ce nu există
+          în niciun părinte.</p></div>
+      </div>
+    </details>
+  </section>
+</main>
+
+<footer>
+  Toate calculele (antrenarea rețelei, evoluția populației) rulează în <b>Java</b> pe server
+  (<code>Spring Boot</code>); browserul doar desenează rezultatele.
+</footer>
+
+<div id="toasts"></div>
+
+<script src="js/common.js"></script>
+<script src="js/nn-ui.js"></script>
+<script src="js/ga-ui.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
